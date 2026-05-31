@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>知乎按观点拉黑工具</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/favicon.png">
+<style>
+  :root{--bg:#0f1115;--card:#171a21;--mut:#8a90a0;--fg:#e6e8ee;--acc:#4f8cff;--ok:#36c08a;--warn:#f0a73a;--bad:#ef5b5b;--line:#262a35}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 18px 80px}
+  h1{font-size:20px;margin:0 0 2px}
+  .sub{color:var(--mut);font-size:13px;margin-bottom:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+  .card h2{font-size:14px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .step{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--acc);color:#fff;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  label{display:block;color:var(--mut);font-size:12px;margin:10px 0 4px}
+  textarea,input,select{width:100%;background:#0d0f14;border:1px solid var(--line);border-radius:8px;color:var(--fg);padding:9px 10px;font-size:13px;font-family:inherit}
+  textarea{resize:vertical}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .grid .full{grid-column:1/-1}
+  button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer}
+  button:hover{filter:brightness(1.08)} button:disabled{opacity:.5;cursor:not-allowed}
+  button.ghost{background:#222633;color:var(--fg)} button.danger{background:var(--bad)} button.ok{background:var(--ok)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .badge{font-size:12px;padding:2px 8px;border-radius:20px;border:1px solid var(--line)}
+  .badge.y{color:var(--ok);border-color:#1f5c45} .badge.n{color:var(--bad);border-color:#5c2424}
+  pre{background:#0a0c10;border:1px solid var(--line);border-radius:8px;padding:12px;max-height:260px;overflow:auto;font-size:12px;white-space:pre-wrap;word-break:break-all;margin:0}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{color:var(--mut);font-weight:600;position:sticky;top:0;background:var(--card)}
+  .tbl-wrap{max-height:460px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+  td.c{text-align:center;white-space:nowrap} .mut{color:var(--mut)}
+  a{color:var(--acc);text-decoration:none} a:hover{text-decoration:underline}
+  .pill{font-size:11px;padding:1px 7px;border-radius:20px;background:#3a2330;color:#ff9db0}
+  .hint{color:var(--mut);font-size:12px;margin-top:6px}
+  .hidden{display:none}
+  .note{background:#1c2433;border:1px solid #2a3550;border-radius:8px;padding:8px 12px;color:#a9c2ff;font-size:12px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>知乎 · 按观点拉黑工具</h1>
+  <div class="sub">粘贴 curl 提供登录态 → 填问题与观点 → 一键分析 → 勾选拉黑（默认预览，执行才真拉，可一键恢复）</div>
+
+  <!-- 1 登录态 -->
+  <div class="card">
+    <h2><span class="step">1</span> 登录态</h2>
+    <div id="sessState" class="mut">检测中…</div>
+    <div id="curlBox" class="hidden">
+      <div class="hint" style="margin-top:10px">在知乎网页 F12 → Network → 任意请求 → 右键 Copy as cURL，整段粘到下面。</div>
+      <label>curl 命令</label>
+      <textarea id="curl" rows="5" placeholder="curl 'https://www.zhihu.com/...' -b '...cookie...' -H 'user-agent: ...'"></textarea>
+      <div class="row">
+        <button id="btnCurl">解析并验证</button>
+        <span id="curlState" class="mut"></span>
+      </div>
+    </div>
+    <div class="row"><a href="#" id="btnShowCurl" class="mut">更换账号 / 更新 curl ▾</a></div>
+  </div>
+
+  <!-- 2 设置 -->
+  <div class="card">
+    <h2><span class="step">2</span> 任务设置</h2>
+    <div class="row" style="margin:0 0 4px">
+      <label style="margin:0"><input type="radio" name="mode" value="answer" checked> 按回答观点拉黑</label>
+      <label style="margin:0"><input type="radio" name="mode" value="comment"> 按评论拉黑（清评论区杠精）</label>
+    </div>
+
+    <div id="answerFields">
+      <label>知乎问题链接或 ID</label>
+      <input id="question" value="https://www.zhihu.com/question/1991274395218491186">
+      <label>你的观点（判定"反对此观点"的人进入拉黑候选）</label>
+      <textarea id="opinion" rows="2" placeholder="例如：斩杀线理论毫无价值，纯属吹捧"></textarea>
+    </div>
+
+    <div id="commentFields" class="hidden">
+      <label>选择我的某条回答（自动加载，含评论数）</label>
+      <select id="myAnswer"><option value="">(切到本模式后加载…)</option></select>
+      <label>或手动填答案链接（优先级高于上面下拉；二者皆空 = 扫我所有有评论的回答）</label>
+      <input id="answerUrl" placeholder="https://www.zhihu.com/question/xxx/answer/yyy">
+      <label>屏蔽标准（评论符合则该评论者进候选；留空 = 默认识别辱骂/抬杠/不友善）</label>
+      <textarea id="criterion" rows="2" placeholder="例如：辱骂、人身攻击、阴阳怪气、无脑抬杠、引战"></textarea>
+      <label style="display:inline-flex;gap:6px;margin-top:8px"><input type="checkbox" id="replies"> 抓取楼中楼回复（更全但更慢）</label>
+    </div>
+
+    <div class="grid" style="margin-top:12px">
+      <div><label>判定引擎</label><select id="engine"></select></div>
+      <div><label>模型</label><input id="model" value="mimo-v2-flash"></div>
+      <div><label>API Key</label><input id="apikey" type="password" placeholder="sk-..."></div>
+      <div><label>并发</label><input id="concurrency" type="number" value="6" min="1" max="20"></div>
+      <div><label id="limitLabel">判定条数（0=全部）</label><input id="limit" type="number" value="30" min="0"></div>
+      <div id="minvoteWrap"><label>最低赞数</label><input id="minvote" type="number" value="0" min="0"></div>
+      <div><label>拉黑置信阈值</label><input id="threshold" type="number" value="0.8" step="0.05" min="0" max="1"></div>
+      <div style="display:flex;align-items:flex-end"><button id="btnRun" style="width:100%">开始分析</button></div>
+    </div>
+    <div class="hint" id="modeHint"></div>
+  </div>
+
+  <!-- 3 进度 -->
+  <div class="card" id="logCard">
+    <h2><span class="step">3</span> 运行日志 <span id="runState" class="mut" style="font-weight:400"></span></h2>
+    <pre id="log">（等待任务…）</pre>
+  </div>
+
+  <!-- 4 名单 -->
+  <div class="card">
+    <h2><span class="step">4</span> 勾选拉黑</h2>
+    <div class="row">
+      <label style="margin:0"><input type="checkbox" id="selAll"> 全选</label>
+      <span id="cnt" class="mut">候选 0 人，已选 0</span>
+      <button class="ghost" id="btnReload">刷新名单</button>
+      <button class="ghost" id="btnClear">清空名单</button>
+      <span style="flex:1"></span>
+      <button class="ghost" id="btnPreview">预览(dry-run)</button>
+      <button class="danger" id="btnBlock">拉黑选中（执行）</button>
+      <button class="ok" id="btnUnblock">恢复全部拉黑</button>
+    </div>
+    <div class="note">拉黑是真实写操作但可逆：执行后会记入恢复名单，点「恢复全部拉黑」即可撤销。受单批上限与限速保护。</div>
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead><tr><th class="c">选</th><th>答主</th><th class="c">赞</th><th class="c">立场</th><th class="c">置信</th><th>理由</th><th>原文</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="7" class="mut" style="text-align:center;padding:20px">暂无名单，先在上面分析</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+async function api(path, method='GET', body){
+  const opt={method,headers:{'content-type':'application/json'}};
+  if(body) opt.body=JSON.stringify(body);
+  const r=await fetch(path,opt); return r.json();
+}
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+// 1) 登录态自检
+async function checkSession(){
+  $('sessState').textContent='检测登录态中…';
+  const s=await api('/api/session');
+  if(s.valid){
+    $('sessState').innerHTML=`<span class="badge y">✓ 已登录</span> <b>${esc(s.name)}</b> <span class="mut">@${esc(s.url_token)}</span> — cookie 有效，无需重新粘`;
+    $('curlBox').classList.add('hidden');
+    $('btnShowCurl').classList.remove('hidden');
+  }else{
+    $('sessState').innerHTML=`<span class="badge n">✗ ${esc(s.reason||'登录态失效')}</span> 请粘贴最新 curl 更新登录态`;
+    $('curlBox').classList.remove('hidden');
+    $('btnShowCurl').classList.add('hidden');
+  }
+}
+$('btnShowCurl').onclick=(e)=>{e.preventDefault();$('curlBox').classList.toggle('hidden')};
+
+$('btnCurl').onclick=async()=>{
+  const curl=$('curl').value.trim(); if(!curl){alert('先粘贴 curl');return;}
+  $('curlState').textContent='解析中…';
+  const r=await api('/api/curl','POST',{curl});
+  if(!r.ok){$('curlState').innerHTML='<span class="badge n">失败</span> '+esc(r.msg||'');return;}
+  $('curlState').textContent='已更新，验证登录态中…';
+  await checkSession();
+  if(!$('curlBox').classList.contains('hidden')){
+    const b=r.has||{};
+    $('curlState').innerHTML=['z_c0','d_c0','_xsrf','__zse_ck']
+      .map(k=>`<span class="badge ${b[k]?'y':'n'}">${k}${b[k]?'✓':'✗'}</span>`).join(' ');
+  }else{$('curlState').textContent='';}
+};
+
+// 2) 模式切换 + 开始分析
+function curMode(){return document.querySelector('input[name=mode]:checked').value}
+function setEngineOptions(m){
+  const opts = m==='comment'
+    ? [['llm','llm（AI按标准判）'],['all','全部列出（人工勾）'],['mock','mock（测试）']]
+    : [['llm','llm（真模型）'],['mock','mock（测试）']];
+  $('engine').innerHTML=opts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('');
+}
+let MY_LOADED=false;
+async function loadMyAnswers(){
+  if(MY_LOADED) return;
+  const sel=$('myAnswer'); sel.innerHTML='<option value="">(加载中…)</option>';
+  const r=await api('/api/my_answers');
+  if(r.ok && r.answers && r.answers.length){
+    sel.innerHTML='<option value="">(选我的某条回答)</option>'+
+      r.answers.map(a=>`<option value="${a.id}">${esc((a.title||a.id).slice(0,28))}（评论${a.comment_count}）</option>`).join('');
+    MY_LOADED=true;
+  }else{ sel.innerHTML='<option value="">(加载失败: '+esc(r.msg||'')+')</option>'; }
+}
+function applyMode(){
+  const m=curMode();
+  $('answerFields').classList.toggle('hidden', m!=='answer');
+  $('commentFields').classList.toggle('hidden', m!=='comment');
+  $('minvoteWrap').style.display = m==='answer' ? '' : 'none';
+  $('limitLabel').textContent = m==='comment' ? '判定评论条数（0=全部）' : '判定条数（0=全部）';
+  setEngineOptions(m);
+  $('modeHint').textContent = m==='comment'
+    ? '评论模式：选/填一条你的回答（或留空扫全部），AI 按标准挑出杠精；engine 选「全部列出」可不调 AI、自己勾。'
+    : '回答模式：先用「判定条数=30」跑高赞 30 条看准，再改 0 跑全部。';
+  if(m==='comment') loadMyAnswers();
+}
+document.querySelectorAll('input[name=mode]').forEach(r=>r.onchange=applyMode);
+
+$('btnRun').onclick=async()=>{
+  const m=curMode();
+  const body={mode:m, engine:$('engine').value, model:$('model').value.trim(), api_key:$('apikey').value.trim(),
+    concurrency:$('concurrency').value, limit:$('limit').value, threshold:$('threshold').value};
+  if(m==='answer'){
+    if(!$('opinion').value.trim()){alert('请填写你的观点');return;}
+    body.question=$('question').value.trim(); body.opinion=$('opinion').value.trim(); body.min_voteup=$('minvote').value;
+  }else{
+    body.answer=$('answerUrl').value.trim() || $('myAnswer').value || '';
+    body.criterion=$('criterion').value.trim();
+    body.replies=$('replies').checked;
+  }
+  const r=await api('/api/run','POST',body);
+  if(!r.ok){alert(r.msg||'启动失败');return;}
+  $('log').textContent='任务已启动…'; poll();
+};
+
+// 通用轮询
+let polling=false;
+async function poll(){
+  if(polling) return; polling=true;
+  $('runState').textContent='● 运行中';
+  while(true){
+    const s=await api('/api/status');
+    $('log').textContent=s.log||'(无输出)';
+    $('log').scrollTop=$('log').scrollHeight;
+    if(s.state!=='running'){
+      $('runState').textContent = s.state==='error' ? ('✗ 出错: '+esc(s.error||'')) : '✓ 完成';
+      if(s.state!=='error') await loadCandidates();
+      break;
+    }
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  polling=false;
+}
+
+// 4) 名单
+let CAND=[];
+async function loadCandidates(){
+  const r=await api('/api/candidates'); CAND=r.candidates||[];
+  const tb=$('rows');
+  if(!CAND.length){tb.innerHTML='<tr><td colspan="7" class="mut" style="text-align:center;padding:20px">无候选</td></tr>';updateCnt();return;}
+  tb.innerHTML=CAND.map((c,i)=>`<tr>
+    <td class="c"><input type="checkbox" class="ck" data-t="${esc(c.url_token)}"></td>
+    <td>${esc(c.name)}<br><span class="mut">@${esc(c.url_token)}</span></td>
+    <td class="c">${esc(c.voteup)}</td>
+    <td class="c"><span class="pill">${esc(c.stance)}</span></td>
+    <td class="c">${esc(c.confidence)}</td>
+    <td>${esc(c.reason)}</td>
+    <td><a href="${esc(c.answer_url)}" target="_blank">${esc((c.excerpt||'').slice(0,28))}…</a></td>
+  </tr>`).join('');
+  document.querySelectorAll('.ck').forEach(x=>x.onchange=updateCnt);
+  $('selAll').checked=false; updateCnt();
+}
+function checkedTokens(){return [...document.querySelectorAll('.ck:checked')].map(x=>x.dataset.t)}
+function updateCnt(){$('cnt').textContent=`候选 ${CAND.length} 人，已选 ${checkedTokens().length}`}
+$('selAll').onchange=e=>{document.querySelectorAll('.ck').forEach(x=>x.checked=e.target.checked);updateCnt()};
+$('btnReload').onclick=loadCandidates;
+$('btnClear').onclick=async()=>{
+  if(!confirm('清空当前候选名单？(删除 blocklist.csv，不影响"已拉黑记录"和恢复功能)')) return;
+  await api('/api/clear','POST',{});
+  await loadCandidates();
+};
+
+async function doBlock(execute){
+  const tokens=checkedTokens();
+  if(!tokens.length){alert('先勾选要拉黑的人');return;}
+  if(execute && !confirm(`确认真实拉黑选中的 ${tokens.length} 人？（可事后一键恢复）`)) return;
+  const r=await api('/api/block','POST',{tokens,execute});
+  if(!r.ok){alert(r.msg||'启动失败');return;}
+  $('log').textContent=execute?'执行拉黑中…':'预览中…'; poll();
+}
+$('btnPreview').onclick=()=>doBlock(false);
+$('btnBlock').onclick=()=>doBlock(true);
+$('btnUnblock').onclick=async()=>{
+  if(!confirm('恢复（取消拉黑）恢复名单里的所有人？')) return;
+  const r=await api('/api/unblock','POST',{execute:true});
+  if(!r.ok){alert(r.msg||'启动失败');return;}
+  $('log').textContent='恢复中…'; poll();
+};
+
+// 启动: 检测登录态 / 初始化模式 / 载入已有名单
+checkSession();
+applyMode();
+loadCandidates();
+</script>
+</body>
+</html>

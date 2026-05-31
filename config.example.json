@@ -1,0 +1,23 @@
+{
+  "cookie_file": "secret_cookies.txt",
+  "question": "1991274395218491186",
+  "data_dir": "data",
+  "llm": {
+    "base_url": "https://api.openai.com/v1",
+    "model": "gpt-4o-mini",
+    "api_key_env": "LLM_API_KEY",
+    "temperature": 0.0,
+    "max_chars": 1800,
+    "concurrency": 4
+  },
+  "stance": {
+    "threshold": 0.8,
+    "block_stances": ["oppose"]
+  },
+  "rate_limit": {
+    "block_min_delay": 3.0,
+    "block_max_delay": 8.0,
+    "block_batch_limit": 50
+  },
+  "proxy": ""
+}

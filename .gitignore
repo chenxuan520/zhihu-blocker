@@ -1,0 +1,10 @@
+# 敏感: 知乎登录 Cookie / 本地配置 / 抓取产物
+secret_cookies.txt
+cookies.txt
+config.json
+data/
+.env
+
+# Go 编译产物
+zhb
+zhihu-blocker
