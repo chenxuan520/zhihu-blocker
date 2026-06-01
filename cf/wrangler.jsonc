@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "zhihu-blocker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-01",
+  "observability": { "enabled": true },
+
+  // 静态前端 (复用 web/index.html, 已拷到 public/); /api/* 不命中静态文件 -> 走 Worker
+  "assets": { "directory": "./public", "binding": "ASSETS" },
+
+  // 每个浏览器会话一个 Durable Object: 强一致存各自的登录态/任务进度/候选名单, 后台跑分析与拉黑
+  "durable_objects": {
+    "bindings": [{ "name": "BLOCKER", "class_name": "ZhihuBlocker" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ZhihuBlocker"] }],
+
+  // Cloudflare Workers AI (内置免费 AI, 用户无需自带 key)
+  "ai": { "binding": "AI" },
+
+  // 非密钥默认值 (LLM key 用 `wrangler secret put LLM_API_KEY`, 或在网页表单里填)
+  "vars": {
+    "LLM_BASE_URL": "https://api.openai.com/v1",
+    "LLM_MODEL": "gpt-4o-mini"
+  }
+}

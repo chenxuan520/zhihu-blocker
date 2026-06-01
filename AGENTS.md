@@ -48,7 +48,15 @@ go build -o zhb .            # 编译（先确保能过）
 - **加 Web 接口**：在 `web.go` 的 `mux` 注册；长任务走 `startBG`（单任务 + 日志重定向到 `data/web_job.log`，前端轮询 `/api/status`）。
 - **加前端能力**：编辑 `web/index.html`（注意它是 `go:embed`，改完要重新 `go build`）。
 
+## cf/（Cloudflare Workers 版）
+与根目录 Go 版**功能一致的平行实现**，用于零服务器分享部署。栈：Worker + 一个 Durable Object（`ZhihuBlocker`，强一致存登录态/任务进度/候选名单，`waitUntil` 跑后台任务）+ Workers 静态资源（前端 = `cf/public/index.html`，是 `web/index.html` 的副本）。
+- `cf/src/zhihu.ts`（爬取/拉黑/会话/curl 解析）、`cf/src/llm.ts`（判定）、`cf/src/do.ts`（DO 编排）、`cf/src/index.ts`（路由 `/api/*` → DO RPC）。
+- API 契约与 Go 版完全一致，故 `index.html` 可直接复用；**改前端要两边同步**（`web/index.html` 与 `cf/public/index.html`）。
+- 约束：纯 Workers 运行时（不用 Node 内建）；LLM key 用 `wrangler secret put`，登录 Cookie 存 DO，均不入库；单次判定有上限 `JUDGE_CAP`（贴合 Workers 限制）。
+- 验证：`cd cf && npm install && npx wrangler types && npx tsc --noEmit && npx wrangler deploy --dry-run`；本地 `npm run dev`。
+- `cf/` 自带 `.gitignore`（`node_modules/`、`.wrangler/`、`.dev.vars`、`worker-configuration.d.ts` 不提交；clone 后需先 `wrangler types`）。
+
 ## Git
 - 提交信息用中文、说明「为什么」。
-- 不要提交 `zhb` 二进制、`data/`、`secret_cookies.txt`、`config.json`。
+- 不要提交 `zhb` 二进制、`data/`、`secret_cookies.txt`、`config.json`、`cf/.dev.vars`、`cf/node_modules/`。
 - 不要改动 git 全局配置。

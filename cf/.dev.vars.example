@@ -1,0 +1,2 @@
+# 本地开发用 (复制为 .dev.vars, 不要提交)。线上用 `wrangler secret put LLM_API_KEY`。
+LLM_API_KEY=sk-xxxxxx

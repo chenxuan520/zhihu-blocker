@@ -109,6 +109,23 @@ GOOS=linux GOARCH=amd64 go build -o zhb .   # 交叉编译
 ```
 单文件、零运行时依赖。⚠️ 注意：在机房 IP 上批量请求更易被风控，建议保守限速或挂住宅代理。
 
+## ☁️ 部署到 Cloudflare（`cf/` 目录，零服务器、可分享）
+
+`cf/` 是 **Cloudflare Workers 版**（Worker + Durable Object 存状态/跑后台任务 + 静态前端），适合一键部署成公网地址分享给别人用，无需服务器。前端与功能与本地版一致。
+
+```bash
+cd cf
+npm install
+npx wrangler login                    # 首次登录 Cloudflare
+npx wrangler secret put LLM_API_KEY    # 设置 LLM key（交互输入，不入库）
+# 按需在 wrangler.jsonc 的 vars 改 LLM_BASE_URL / LLM_MODEL
+npx wrangler deploy                    # 部署, 得到 https://zhihu-blocker.<你>.workers.dev
+```
+
+本地开发：`cp .dev.vars.example .dev.vars`（填 key）→ `npm run dev`。每个使用者在网页里粘自己的 curl 提供知乎登录态（存进各自的 Durable Object）。
+
+> ⚠️ CF 版两点取舍：① 出网用的是 **Cloudflare 机房 IP**，比本地住宅 IP 更易被知乎风控（带登录 Cookie 多数能过，但不保证）；② Workers 单次有 CPU/子请求上限，**CF 版单次最多判定约 150 条**，全量大规模扫描请用上面的本地 Go 版。
+
 ## ⚠️ 风险与免责
 
 - 自动化抓取与批量操作属知乎 ToS 灰色地带，**仅供个人小范围、低频使用**，请勿商用或公开服务。

@@ -86,16 +86,21 @@
       <label style="display:inline-flex;gap:6px;margin-top:8px"><input type="checkbox" id="replies"> 抓取楼中楼回复（更全但更慢）</label>
     </div>
 
+    <!-- 第一行: 判定后端 / LLM 配置 -->
     <div class="grid" style="margin-top:12px">
-      <div><label>判定引擎</label><select id="engine"></select></div>
-      <div><label>模型</label><input id="model" value="mimo-v2-flash"></div>
-      <div><label>API Key</label><input id="apikey" type="password" placeholder="sk-..."></div>
+      <div><label>判定后端</label><select id="engine"></select></div>
+      <div id="baseurlWrap"><label>LLM 地址 base_url</label><input id="baseurl" placeholder="https://api.xxx.com/v1"></div>
+      <div id="modelWrap"><label>模型</label><input id="model" placeholder="模型名"></div>
+      <div id="apikeyWrap"><label>API Key</label><input id="apikey" type="password" placeholder="sk-..."></div>
+    </div>
+    <!-- 第二行: 数值参数 -->
+    <div class="grid" style="margin-top:10px">
       <div><label>并发</label><input id="concurrency" type="number" value="6" min="1" max="20"></div>
       <div><label id="limitLabel">判定条数（0=全部）</label><input id="limit" type="number" value="30" min="0"></div>
       <div id="minvoteWrap"><label>最低赞数</label><input id="minvote" type="number" value="0" min="0"></div>
       <div><label>拉黑置信阈值</label><input id="threshold" type="number" value="0.8" step="0.05" min="0" max="1"></div>
-      <div style="display:flex;align-items:flex-end"><button id="btnRun" style="width:100%">开始分析</button></div>
     </div>
+    <div style="margin-top:12px;text-align:right"><button id="btnRun" style="min-width:160px;padding:10px 24px">开始分析</button></div>
     <div class="hint" id="modeHint"></div>
   </div>
 
@@ -170,11 +175,22 @@ $('btnCurl').onclick=async()=>{
 // 2) 模式切换 + 开始分析
 function curMode(){return document.querySelector('input[name=mode]:checked').value}
 function setEngineOptions(m){
+  const llm = [['cfai','Cloudflare 免费AI'],['custom','自定义LLM(OpenAI兼容)']];
   const opts = m==='comment'
-    ? [['llm','llm（AI按标准判）'],['all','全部列出（人工勾）'],['mock','mock（测试）']]
-    : [['llm','llm（真模型）'],['mock','mock（测试）']];
+    ? [...llm, ['all','全部列出（人工勾）'], ['mock','mock（测试）']]
+    : [...llm, ['mock','mock（测试）']];
   $('engine').innerHTML=opts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('');
 }
+// 根据后端显示/隐藏 base_url / model / key
+function applyProvider(){
+  const e=$('engine').value, isCustom=e==='custom', isCfai=e==='cfai', m=$('model');
+  $('baseurlWrap').style.display = isCustom ? '' : 'none';
+  $('apikeyWrap').style.display  = isCustom ? '' : 'none';
+  $('modelWrap').style.display   = (isCustom||isCfai) ? '' : 'none';
+  if(isCfai){ if(m.dataset.kind!=='cfai'){ m.value='@cf/meta/llama-3.1-8b-instruct'; m.dataset.kind='cfai'; } m.placeholder='@cf/... (Cloudflare 模型)'; }
+  else if(isCustom){ if(m.dataset.kind!=='custom'){ m.value=''; m.dataset.kind='custom'; } m.placeholder='如 gpt-4o-mini / deepseek-chat'; }
+}
+$('engine').onchange=applyProvider;
 let MY_LOADED=false;
 async function loadMyAnswers(){
   if(MY_LOADED) return;
@@ -193,16 +209,17 @@ function applyMode(){
   $('minvoteWrap').style.display = m==='answer' ? '' : 'none';
   $('limitLabel').textContent = m==='comment' ? '判定评论条数（0=全部）' : '判定条数（0=全部）';
   setEngineOptions(m);
+  applyProvider();
   $('modeHint').textContent = m==='comment'
-    ? '评论模式：选/填一条你的回答（或留空扫全部），AI 按标准挑出杠精；engine 选「全部列出」可不调 AI、自己勾。'
-    : '回答模式：先用「判定条数=30」跑高赞 30 条看准，再改 0 跑全部。';
+    ? '评论模式：选/填一条你的回答（或留空扫全部），按标准挑出杠精。后端可选 Cloudflare 免费AI / 自定义LLM / 全部列出(人工勾)。'
+    : '回答模式：先用「判定条数=30」跑高赞 30 条看准，再改 0 跑全部。后端默认用 Cloudflare 免费AI，也可填自己的 LLM。';
   if(m==='comment') loadMyAnswers();
 }
 document.querySelectorAll('input[name=mode]').forEach(r=>r.onchange=applyMode);
 
 $('btnRun').onclick=async()=>{
   const m=curMode();
-  const body={mode:m, engine:$('engine').value, model:$('model').value.trim(), api_key:$('apikey').value.trim(),
+  const body={mode:m, engine:$('engine').value, base_url:$('baseurl').value.trim(), model:$('model').value.trim(), api_key:$('apikey').value.trim(),
     concurrency:$('concurrency').value, limit:$('limit').value, threshold:$('threshold').value};
   if(m==='answer'){
     if(!$('opinion').value.trim()){alert('请填写你的观点');return;}
@@ -281,10 +298,12 @@ $('btnUnblock').onclick=async()=>{
   $('log').textContent='恢复中…'; poll();
 };
 
-// 启动: 检测登录态 / 初始化模式 / 载入已有名单
-checkSession();
-applyMode();
-loadCandidates();
+// 启动: 先 await 会话(顺带建立 zsess 会话 cookie), 再初始化模式与名单
+(async () => {
+  await checkSession();
+  applyMode();
+  await loadCandidates();
+})();
 </script>
 </body>
 </html>
