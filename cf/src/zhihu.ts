@@ -143,6 +143,7 @@ export async function crawlAnswers(
   cookie: string,
   ua: string,
   onProgress: (got: number, totals: number, isEnd: boolean) => void,
+  maxItems = 0,
   maxPages = 40,
 ): Promise<AnswerItem[]> {
   let url =
@@ -156,6 +157,7 @@ export async function crawlAnswers(
     const { status, data } = await zGet(url, cookie, ua);
     if (status !== 200 || !data?.data) throw new Error(`采集失败 status=${status}`);
     for (const a of data.data) {
+      if (maxItems > 0 && out.length >= maxItems) break;
       const id = String(a.id);
       if (seen.has(id)) continue;
       seen.add(id);
@@ -171,6 +173,7 @@ export async function crawlAnswers(
       });
     }
     onProgress(out.length, data.paging?.totals || 0, !!data.paging?.is_end);
+    if (maxItems > 0 && out.length >= maxItems) break;
     if (data.paging?.is_end || !data.data.length) break;
     url = data.paging?.next;
     await sleep(300 + Math.random() * 300);

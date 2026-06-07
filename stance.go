@@ -36,7 +36,7 @@ func loadAnswers(c *Config) ([]*Answer, error) {
 
 func cacheKey(opinion, id string) string {
 	h := sha1.Sum([]byte(opinion))
-	return fmt.Sprintf("%x:%s", h[:4], id)
+	return fmt.Sprintf("%x:%s", h, id)
 }
 
 func loadStanceCache(c *Config) map[string]stanceResult {

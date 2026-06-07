@@ -155,10 +155,19 @@ func analyzeJob(body map[string]any) error {
 	// 回答观点模式
 	question, _ := body["question"].(string)
 	opinion, _ := body["opinion"].(string)
-	if err := Crawl(c, question); err != nil {
-		return err
+	limit := toInt(body["limit"], 0)
+	qid := parseQID(question)
+	if qid == "" {
+		qid = parseQID(c.Question)
 	}
-	if err := RunStance(c, opinion, engine, toInt(body["limit"], 0), toInt(body["min_voteup"], 0)); err != nil {
+	if cached := cachedAnswerCount(c, qid); limit > 0 && cached >= limit {
+		jprintf("[crawl] 复用本地回答: 问题 %s 已有 %d 条, 本次需要 %d 条。\n", qid, cached, limit)
+	} else {
+		if err := Crawl(c, question, limit); err != nil {
+			return err
+		}
+	}
+	if err := RunStance(c, opinion, engine, limit, toInt(body["min_voteup"], 0)); err != nil {
 		return err
 	}
 	return BuildBlocklist(c)

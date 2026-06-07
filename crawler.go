@@ -92,7 +92,7 @@ func parseQID(q string) string {
 	return strings.TrimSpace(q)
 }
 
-func Crawl(c *Config, question string) error {
+func Crawl(c *Config, question string, maxAnswers int) error {
 	if question == "" {
 		question = c.Question
 	}
@@ -129,7 +129,11 @@ func Crawl(c *Config, question string) error {
 			return fmt.Errorf("解析 JSON 失败: %w", err)
 		}
 		totals = resp.Paging.Totals
+		added := 0
 		for _, a := range resp.Data {
+			if maxAnswers > 0 && len(seen) >= maxAnswers {
+				break
+			}
 			id := a.ID.String()
 			if id == "" || seen[id] {
 				continue
@@ -156,8 +160,13 @@ func Crawl(c *Config, question string) error {
 			line, _ := json.Marshal(ans)
 			w.Write(line)
 			w.WriteByte('\n')
+			added++
 		}
-		jprintf("page %3d | +%2d | 累计 %4d/%d | is_end=%v\n", page, len(resp.Data), len(seen), totals, resp.Paging.IsEnd)
+		jprintf("page %3d | +%2d | 累计 %4d/%d | is_end=%v\n", page, added, len(seen), totals, resp.Paging.IsEnd)
+		if maxAnswers > 0 && len(seen) >= maxAnswers {
+			jprintf("[crawl] 已达抓取上限 %d, 停止。\n", maxAnswers)
+			break
+		}
 		if resp.Paging.IsEnd || len(resp.Data) == 0 {
 			break
 		}
@@ -167,6 +176,24 @@ func Crawl(c *Config, question string) error {
 	}
 	jprintf("\n[crawl] 完成: %d 个回答 (匿名 %d) -> %s\n", len(seen), anon, c.DataPath("answers.jsonl"))
 	return nil
+}
+
+func cachedAnswerCount(c *Config, qid string) int {
+	rows, err := loadAnswers(c)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, a := range rows {
+		if a.AnswerID == "" {
+			continue
+		}
+		if parseQID(a.AnswerURL) != qid {
+			return 0
+		}
+		count++
+	}
+	return count
 }
 
 func truncate(s string, n int) string {

@@ -204,7 +204,7 @@ export class ZhihuBlocker extends DurableObject<Env> {
     await this.log(`[crawl] 开始抓取问题 ${qid} 的回答…`);
     let items: AnswerItem[] = await crawlAnswers(qid, cookie, ua, (got, totals, isEnd) => {
       void this.log(`[crawl] 累计 ${got}/${totals} is_end=${isEnd}`);
-    });
+    }, limit > 0 ? Math.min(limit, JUDGE_CAP) : 0);
     items.sort((a, b) => b.voteup - a.voteup);
     const before = items.length;
     if (limit > 0 && limit < items.length) items = items.slice(0, limit);

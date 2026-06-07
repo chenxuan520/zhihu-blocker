@@ -42,7 +42,7 @@ func main() {
 		fs := flag.NewFlagSet("crawl", flag.ExitOnError)
 		q := fs.String("question", "", "问题 URL 或 ID")
 		fs.Parse(os.Args[2:])
-		must(Crawl(cfg(), *q))
+		must(Crawl(cfg(), *q, 0))
 	case "stance":
 		fs := flag.NewFlagSet("stance", flag.ExitOnError)
 		opinion := fs.String("opinion", "", "你的观点")

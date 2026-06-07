@@ -8,3 +8,6 @@ data/
 # Go 编译产物
 zhb
 zhihu-blocker
+
+# OpenCode 本地配置/插件依赖
+.opencode/
